@@ -1,0 +1,516 @@
+///////////////////////////////////////////////////
+//
+// THIS MAGMA CODE FINDS SUFFICIENT CONDITIONS PROVING THAT
+// CERTAIN CARTAN MODULAR CURVES HAVE ONLY AUTOMORPHISMS 
+// DEFINED OVER COMPOSITUM OF QUADRATIC FIELDS
+//
+// IN APRIL 2020 IT WAS POSSIBLE TO RUN IT ON THE ONLNE CALCULATOR 
+// AVAILABLE at http://magma.maths.usyd.edu.au/calc/
+//
+// DEVELOPED BY GUIDO LIDO: (contact: guidomaria.lido@gmail.com)
+// 
+//////////////////////////////////////////////////
+
+Genus_Xns := function(level)
+    beta_2 := 1;
+    beta_3 := 1;
+    for p in PrimeDivisors(level) do
+        if ((p mod 4) ne 3) then
+            beta_2 := 0;
+        end if;
+        if ((p mod 3) ne 2) then
+            beta_3 := 0;
+        end if;
+    end for;
+    answer := 1 + EulerPhi(level)*(level-6)/12 - 2^(#PrimeDivisors(level))*beta_2/4 - 2^(#PrimeDivisors(level))*beta_3/3;
+    return Ceiling(answer);
+end function;
+
+Genus_Xnspl := function(level)
+    // We use Baran's notation. It works if level is not congruent to 2 modulo 4.
+    beta_boh := 1;
+    beta_3 := 1;
+    for p in PrimeDivisors(level) do
+        if ((p mod 3) ne 2) then
+            beta_3 := 0;
+        end if;
+        r := Valuation(level, p);
+        if p eq 2 then
+            beta_boh *:= p^r;
+        elif ((p mod 4) eq 1) then
+            beta_boh *:= p^r-p^(r-1);
+        else
+            beta_boh *:= p^r+p^(r-1)+2;
+        end if;
+    end for;
+    answer := 1 + EulerPhi(level)*(level-6)/(12*2^(#PrimeDivisors(level))) - beta_3/3 - beta_boh/(4*2^(#PrimeDivisors(level)));
+    return Ceiling(answer);
+end function;
+
+Genus_X0pl := function(p,i)
+    // only works for prime power level
+    if p eq 2 then
+        if (i eq 1) or (i eq 2) then
+            return 0;
+        end if;
+        eps_2 := 0;
+        eps_3 := 0;
+        if i mod 2 eq 1 then
+            eps_inf := 2*p^((i-1) div 2);
+        else
+            eps_inf := p^((i-2) div 2) + p^(i div 2);
+        end if;
+        g_0 := 1 + p^(i-1)*(p+1)/12 - (1/2)*eps_inf - (1/4)*eps_2 - (1/3)*eps_3;
+        h2 := ClassNumber(-4*p^i);
+        return (g_0+1)/2 -h2/4;
+    end if;
+    if (p eq 3) and (i eq 1) then
+        return 0;
+    end if;
+    // Now the case p odd.
+    if (p mod 4) eq 1 then
+        eps_2 := 2;
+    else
+        eps_2 := 0;
+    end if;
+    if p mod 3 eq 1 then
+        eps_3 := 2;
+    elif p mod 3 eq 2 then
+        eps_3 := 0;
+    elif i eq 1 then
+        eps_3 := 1;
+    else
+        eps_3 := 0;
+    end if;
+    if (i mod 2) eq 1 then
+        eps_inf := 2*p^((i-1) div 2);
+    else
+        eps_inf := p^((i-2) div 2) + p^(i div 2);
+    end if;
+    g_0 := 1 + p^(i-1)*(p+1)/12 - (1/2)*eps_inf - (1/4)*eps_2 - (1/3)*eps_3;
+    D1 := -p^i;
+    D2 := -4*p^i;
+    h2 := ClassNumber(D2);
+    if ((D1 mod 4) eq 2) or ((D1 mod 4) eq 3) then
+        h1 := 0;
+    else
+        h1 := ClassNumber(D1);
+    end if;
+    return (g_0+1)/2 -(h1+h2)/4;
+end function;
+
+
+FieldBound_X0pl := function(p,m)
+    // for e=1,...,m does the following: looks for bound on the CM part of J_0^+(p^e) and if this bound is small enough then we know the field of definition of the automorphisms of X_0^+(p^e), otherwise we do not know. The output is the list [p^{e_1},..., p^{e_k}] such that we do not knoe the field of definition of the automorphisms of X_0^+(p^e).
+    //Notice that is if f is a newform with CM and J_f is an elliptic curve, then we know that all the automorphisms of J_f are defined on the field K_p in the paper). Hence it is enough looking for a bound for the sum of dim(J_f), for J_f inside J_0^+(p^e) such that f has cm and dim(J_f)>1.
+    answer :=[];
+    if (p mod 4) eq 1 then
+        return answer;
+    elif p eq 2 then
+        cm_new:=[0,0,0,0,0,0,0,2,4,4]; //vector v such that v[i] is a bound on dim(A) where A inside J0^{new}(p^i) is the CM part for which we do not know the field of definition of the endomorphisms of A.
+        for i in [2 .. 10] do
+            g_plus_CM := 0;
+            for j in [1..i] do
+                if ((i-j) mod 2) eq 1 then
+                    g_plus_CM +:= (cm_new[j])*(i-j+1)/2;
+                else
+                    g_plus_CM +:= (cm_new[j])*(i-j+2)/2;
+                end if;
+            end for;
+            g_plus := Genus_X0pl(p,i);
+            if ((2*g_plus_CM+1) ge g_plus) then
+                answer := Append(answer, p^i);
+            end if;
+        end for;
+        for i in [11 .. m] do
+            if (i mod 2) eq 1 then
+                cm_new := Append(cm_new, p^((i-3)/2) + p^((i-3)/2));
+            else
+                cm_new := Append(cm_new, p^((i-4)/2) + p^((i-2)/2));
+            end if;
+            g_plus_CM := 0;
+            for j in [1..i] do
+                if ((i-j) mod 2) eq 1 then
+                    g_plus_CM +:= (cm_new[j])*(i-j+1)/2;
+                else
+                    g_plus_CM +:= (cm_new[j])*(i-j+2)/2;
+                end if;
+            end for;
+            //Now we compute the genus of X0+(p^i) using the formulas
+            g_plus := Genus_X0pl(p,i);
+            if ((2*g_plus_CM+1) ge g_plus) then
+                answer := Append(answer, p^i);
+            end if;
+        end for;
+    elif p eq 3 then
+        cm_new:=[0,0,0,0,0,0];
+        for i in [1 .. 6] do
+            g_plus_CM := 0;
+            for j in [1..i] do
+                if ((i-j) mod 2) eq 1 then
+                    g_plus_CM +:= (cm_new[j])*(i-j+1)/2;
+                else
+                    g_plus_CM +:= (cm_new[j])*(i-j+2)/2;
+                end if;
+            end for;
+            g_plus := Genus_X0pl(p,i);
+            if ((2*g_plus_CM+1) ge g_plus) then
+                answer := Append(answer, p^i);
+            end if;
+        end for;
+        for i in [7..m] do
+            if (i mod 2) eq 1 then 
+                cm_new := Append(cm_new, ClassNumber(-p)*p^((i-1)/2));  
+            else
+                cm_new := Append(cm_new, ClassNumber(-p)*p^((i-2)/2));  
+            end if;
+            g_plus_CM:=0;
+            for j in [1..i] do
+                if ((i-j) mod 2) eq 1 then
+                    g_plus_CM +:= (cm_new[j])*(i-j+1)/2;
+                else
+                    g_plus_CM +:= (cm_new[j])*(i-j+2)/2;
+                end if;
+            end for;
+            g_plus := Genus_X0pl(p,i);
+            if ((2*g_plus_CM+1) ge g_plus) then
+                answer := Append(answer, p^i);
+            end if;
+        end for;
+    elif p eq 7 then
+        cm_new:=[0,0,6,0];
+        for i in [1 .. 4] do
+            g_plus_CM := 0;
+            for j in [1..i] do
+                if ((i-j) mod 2) eq 1 then
+                    g_plus_CM +:= (cm_new[j])*(i-j+1)/2;
+                else
+                    g_plus_CM +:= (cm_new[j])*(i-j+2)/2;
+                end if;
+            end for;
+            g_plus := Genus_X0pl(p,i);
+            if ((2*g_plus_CM+1) ge g_plus) then
+                answer := Append(answer, p^i);
+            end if;
+        end for;
+        for i in [5..m] do
+            if (i mod 2) eq 1 then 
+                cm_new := Append(cm_new, ClassNumber(-p)*p^((i-1)/2));  
+            else
+                cm_new := Append(cm_new, ClassNumber(-p)*p^((i-2)/2));  
+            end if;
+            g_plus_CM:=0;
+            for j in [1..i] do
+                if ((i-j) mod 2) eq 1 then
+                    g_plus_CM +:= (cm_new[j])*(i-j+1)/2;
+                else
+                    g_plus_CM +:= (cm_new[j])*(i-j+2)/2;
+                end if;
+            end for;
+            g_plus := Genus_X0pl(p,i);
+            if ((2*g_plus_CM+1) ge g_plus) then
+                answer := Append(answer, p^i);
+            end if;
+        end for;
+    elif p eq 11 then
+        cm_new:=[0,0];
+        for i in [1 .. 2] do
+            g_plus_CM := 0;
+            for j in [1..i] do
+                if ((i-j) mod 2) eq 1 then
+                    g_plus_CM +:= (cm_new[j])*(i-j+1)/2;
+                else
+                    g_plus_CM +:= (cm_new[j])*(i-j+2)/2;
+                end if;
+            end for;
+            g_plus := Genus_X0pl(p,i);
+            if ((2*g_plus_CM+1) ge g_plus) then
+                answer := Append(answer, p^i);
+            end if;
+        end for;
+        for i in [3..m] do
+            if (i mod 2) eq 1 then 
+                cm_new := Append(cm_new, ClassNumber(-p)*p^((i-1)/2));  
+            else
+                cm_new := Append(cm_new, ClassNumber(-p)*p^((i-2)/2));  
+            end if;
+            g_plus_CM:=0;
+            for j in [1..i] do
+                if ((i-j) mod 2) eq 1 then
+                    g_plus_CM +:= (cm_new[j])*(i-j+1)/2;
+                else
+                    g_plus_CM +:= (cm_new[j])*(i-j+2)/2;
+                end if;
+            end for;
+            g_plus := Genus_X0pl(p,i);
+            if ((2*g_plus_CM+1) ge g_plus) then
+                answer := Append(answer, p^i);
+            end if;
+        end for;
+    else
+        cm_new:=[];
+        for i in [1..m] do
+            if (i mod 2) eq 1 then 
+                cm_new := Append(cm_new, ClassNumber(-p)*p^((i-1)/2));  
+            else
+                cm_new := Append(cm_new, ClassNumber(-p)*p^((i-2)/2));  
+            end if;
+            g_plus_CM:=0;
+            for j in [1..i] do
+                if ((i-j) mod 2) eq 1 then
+                    g_plus_CM +:= (cm_new[j])*(i-j+1)/2;
+                else
+                    g_plus_CM +:= (cm_new[j])*(i-j+2)/2;
+                end if;
+            end for;
+            g_plus := Genus_X0pl(p,i);
+            if ((2*g_plus_CM+1) ge g_plus) then
+                answer := Append(answer, p^i);
+            end if;
+        end for;
+    end if;
+    return answer;
+end function;
+
+FieldBound_Xns := function(p,m)
+    // for i=1,...,m does the following: looks for bound on the CM part of J_ns(p^i) and if this bound is small enough then we know the field of definition of the automorphisms of X_ns(p^i), otherwise we do not know. The output is the list [p^{i_1},..., p^{i_k}] such that we do not knoe the field of definition of the automorphisms of X_ns(i^e).
+    //Notice that is if f is a newform with CM and J_f is an elliptic curve, then we know that all the automorphisms of J_f are defined on the field K_p in the paper). Hence it is enough looking for a bound for the sum of dim(J_f), for J_f inside J_ns(p^e) such that f has cm and dim(J_f)>1.
+    answer :=[];
+    if (p mod 4) eq 1 then
+        return answer;
+    elif p eq 2 then
+        cm_new:=[0,0,0,2,4]; //vector v such that v[i] is a bound on dim(A) where A inside J0^{new}(p^{2i}) is the CM part for which we do not know the field of definition of the endomorphisms of A.
+        g_ns_CM := 0;
+        for i in [1 .. 5] do
+            g_ns_CM +:= cm_new[i];
+            g_ns := Genus_Xns(p^i);
+            if ((2*g_ns_CM+1) ge g_ns) then
+                answer := Append(answer, p^i);
+            end if;
+        end for;
+        for i in [6 .. m] do
+            cm_new := Append(cm_new, p^((2*i-4) div 2) + p^((2*i-2) div 2));
+            g_ns_CM +:= cm_new[i];
+            g_ns := Genus_Xns(p^i);
+            if ((2*g_ns_CM+1) ge g_ns) then
+                answer := Append(answer, p^i);
+            end if;
+        end for;
+    elif p eq 3 then
+        cm_new:=[0,0,0]; //vector v such that v[i] is a bound on dim(A) where A inside J0^{new}(p^{2i}) is the CM part for which we do not know the field of definition of the endomorphisms of A.
+        g_ns_CM := 0;
+        for i in [1 .. 3] do
+            g_ns_CM +:= cm_new[i];
+            g_ns := Genus_Xns(p^i);
+            if ((2*g_ns_CM+1) ge g_ns) then
+                answer := Append(answer, p^i);
+            end if;
+        end for;
+        for i in [4 .. m] do
+            cm_new := Append(cm_new, ClassNumber(-p)*p^((2*i-2)/2));  
+            g_ns_CM +:= cm_new[i];
+            g_ns := Genus_Xns(p^i);
+            if ((2*g_ns_CM+1) ge g_ns) then
+                answer := Append(answer, p^i);
+            end if;
+        end for;
+    elif p eq 7 then
+        cm_new:=[0,0]; //vector v such that v[i] is a bound on dim(A) where A inside J0^{new}(p^{2i}) is the CM part for which we do not know the field of definition of the endomorphisms of A.
+        g_ns_CM := 0;
+        for i in [1 .. 2] do
+            g_ns_CM +:= cm_new[i];
+            g_ns := Genus_Xns(p^i);
+            if ((2*g_ns_CM+1) ge g_ns) then
+                answer := Append(answer, p^i);
+            end if;
+        end for;
+        for i in [3 .. m] do
+            cm_new := Append(cm_new, ClassNumber(-p)*p^((2*i-2)/2));  
+            g_ns_CM +:= cm_new[i];
+            g_ns := Genus_Xns(p^i);
+            if ((2*g_ns_CM+1) ge g_ns) then
+                answer := Append(answer, p^i);
+            end if;
+        end for;
+    else
+        cm_new:=[]; //vector v such that v[i] is a bound on dim(A) where A inside J0^{new}(p^{2i}) is the CM part for which we do not know the field of definition of the endomorphisms of A.
+        g_ns_CM := 0;
+        for i in [1 .. m] do
+            cm_new := Append(cm_new, ClassNumber(-p)*p^((2*i-2)/2));  
+            g_ns_CM +:= cm_new[i];
+            g_ns := Genus_Xns(p^i);
+            if ((2*g_ns_CM+1) ge g_ns) then
+                answer := Append(answer, p^i);
+            end if;
+        end for;
+    end if;
+    return answer;
+end function;
+
+
+FieldBound_Xnspl := function(p,m)
+    // for i=1,...,m does the following: looks for bound on the CM part of J_ns^+(p^i) and if this bound is small enough then we know the field of definition of the automorphisms of X_ns^+(p^i), otherwise we do not know. The output is the list [p^{i_1},..., p^{i_k}] such that we do not knoe the field of definition of the automorphisms of X_ns^+(i^e).
+    //Notice that is if f is a newform with CM and J_f is an elliptic curve, then we know that all the automorphisms of J_f are defined on the field K_p in the paper). Hence it is enough looking for a bound for the sum of dim(J_f), for J_f inside J_ns^+(p^e) such that f has cm and dim(J_f)>1.
+    answer :=[];
+    if (p mod 4) eq 1 then
+        return answer;
+    elif p eq 2 then
+        cm_new:=[0,0,0,0,4,8]; //vector v such that v[i] is a bound on dim(A) where A inside J0^{new, +}(p^{2i}) is the CM part for which we do not know the field of definition of the endomorphisms of A.
+        g_ns_CM := 0;
+        for i in [1 .. 6] do
+            g_ns_CM +:= cm_new[i];
+            g_ns := Genus_Xnspl(p^i);
+            if ((2*g_ns_CM+1) ge g_ns) then
+                answer := Append(answer, p^i);
+            end if;
+        end for;
+        for i in [7 .. m] do
+            cm_new := Append(cm_new, p^((2*i-4) div 2) + p^((2*i-2) div 2));
+            g_ns_CM +:= cm_new[i];
+            g_ns := Genus_Xnspl(p^i);
+            if ((2*g_ns_CM+1) ge g_ns) then
+                answer := Append(answer, p^i);
+            end if;
+        end for;
+    elif p eq 3 then
+        cm_new:=[0,0,0]; //vector v such that v[i] is a bound on dim(A) where A inside J0^{new}(p^{2i}) is the CM part for which we do not know the field of definition of the endomorphisms of A.
+        g_ns_CM := 0;
+        for i in [1 .. 3] do
+            g_ns_CM +:= cm_new[i];
+            g_ns := Genus_Xnspl(p^i);
+            if ((2*g_ns_CM+1) ge g_ns) then
+                answer := Append(answer, p^i);
+            end if;
+        end for;
+        for i in [4 .. m] do
+            cm_new := Append(cm_new, ClassNumber(-p)*p^((2*i-2)/2));  
+            g_ns_CM +:= cm_new[i];
+            g_ns := Genus_Xnspl(p^i);
+            if ((2*g_ns_CM+1) ge g_ns) then
+                answer := Append(answer, p^i);
+            end if;
+        end for;
+    elif p eq 7 then
+        cm_new:=[0,0]; //vector v such that v[i] is a bound on dim(A) where A inside J0^{new}(p^{2i}) is the CM part for which we do not know the field of definition of the endomorphisms of A.
+        g_ns_CM := 0;
+        for i in [1 .. 2] do
+            g_ns_CM +:= cm_new[i];
+            g_ns := Genus_Xnspl(p^i);
+            if ((2*g_ns_CM+1) ge g_ns) then
+                answer := Append(answer, p^i);
+            end if;
+        end for;
+        for i in [3 .. m] do
+            cm_new := Append(cm_new, ClassNumber(-p)*p^((2*i-2)/2));  
+            g_ns_CM +:= cm_new[i];
+            g_ns := Genus_Xnspl(p^i);
+            if ((2*g_ns_CM+1) ge g_ns) then
+                answer := Append(answer, p^i);
+            end if;
+        end for;
+    else
+        cm_new:=[]; //vector v such that v[i] is a bound on dim(A) where A inside J0^{new}(p^{2i}) is the CM part for which we do not know the field of definition of the endomorphisms of A.
+        g_ns_CM := 0;
+        for i in [1 .. m] do
+            cm_new := Append(cm_new, ClassNumber(-p)*p^((2*i-2)/2));  
+            g_ns_CM +:= cm_new[i];
+            g_ns := Genus_Xnspl(p^i);
+            if ((2*g_ns_CM+1) ge g_ns) then
+                answer := Append(answer, p^i);
+            end if;
+        end for;
+    end if;
+    return answer;
+end function;
+
+
+
+///////////////////////////////////
+// APPLICATION
+///////////////////////////////////
+
+p:=2;
+bound_a_priori:=3000;
+print "If p^e is not in one of the following lists, then we know that either the genus of X_0^+(p^e) is 0,1, or all the automorphisms od X_0^+(p^e) are defined over K_p";
+while p le bound_a_priori do
+    m := Floor(Log(bound_a_priori)/Log(p));
+    bad_q:= FieldBound_X0pl(p, m);
+    if #bad_q eq 1 and IsPrime(bad_q[1]) then 
+        // We do not print this case because it was done by Baker and Hasegawa. 
+        robo:=1;
+    elif bad_q ne [] then
+        print bad_q;
+        v:=[];
+        for x in bad_q do
+            v:=Append(v,Genus_X0pl(p, Valuation(x,p)));
+        end for;
+        print "The curves above have genus", v;
+    end if;
+    p:=NextPrime(p);
+end while;
+
+p:=2;
+bound_a_priori:=3000;
+print "If p^e is not in one of the following lists, then we know that all the automorphisms od X_ns^+(p^e) are defined over K_p";
+while p le bound_a_priori do
+    m := Floor(Log(bound_a_priori)/Log(p));
+    bad_q:= FieldBound_Xnspl(p, m);
+    if bad_q ne [] then
+        print bad_q;
+        v:=[];
+        for x in bad_q do
+            v:=Append(v,Genus_Xnspl(x));
+        end for;
+        print "The curves above have genus", v;
+    end if;
+    p:=NextPrime(p);
+end while;
+
+p:=2;
+bound_a_priori:=3000;
+print "If p^e is not in one of the following lists, then we know that all the automorphisms od X_ns(p^e) are defined over K_p";
+while p le bound_a_priori do
+    m := Floor(Log(bound_a_priori)/Log(p));
+    bad_q:= FieldBound_Xns(p, m);
+    if bad_q ne [] then
+        print bad_q;
+        v:=[];
+        for x in bad_q do
+            v:=Append(v,Genus_Xns(x));
+        end for;
+        print "The curves above have genus", v;
+    end if;
+    p:=NextPrime(p);
+end while;
+
+print "The case of X_0^+(7^3) can be treated separately indeed the genus is ";
+print Genus_X0pl(7,3);
+dim_cm_interst:=0;
+N3:=Newforms(CuspForms(7^3,2));
+for h in N3 do
+    A:=ModularAbelianVariety(h[1]);
+    segno:=Matrix(AtkinLehnerOperator(A,7^3))[1,1];
+    has_cm:=HasCM(ModularSymbols(A)[1]);
+    if (segno eq 1) and has_cm and (Dimension(A) ge 2) then
+        dim_cm_interst+:=Dimension(A);
+    end if;
+end for;
+N2:=Newforms(CuspForms(7^2,2));
+for h in N2 do
+    A:=ModularAbelianVariety(h[1]);
+    has_cm:=HasCM(ModularSymbols(A)[1]);
+    if  has_cm and (Dimension(A) ge 2) then
+        dim_cm_interst+:=Dimension(A);
+    end if;
+end for;
+N1:=Newforms(CuspForms(7^1,2));
+for h in N1 do
+    A:=ModularAbelianVariety(h[1]);
+    has_cm:=HasCM(ModularSymbols(A)[1]);
+    if  has_cm and (Dimension(A) ge 2) then
+        dim_cm_interst+:=3*Dimension(A);
+    end if;
+end for;
+
+print "and the dimension of (the CM part wich does not split over Q as product of elliptic curves) is at most";
+print dim_cm_interst;
