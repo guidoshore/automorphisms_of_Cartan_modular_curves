@@ -1,0 +1,576 @@
+///////////////////////////////////////////////////
+//
+// THIS CODE FINDS SUFFICIENT CONDITIONS PROVING THAT
+// CERTAIN CARTAN MODULAR CURVES HAVE ONLY MODULAR AUTOMORPHISMS 
+//
+// THE LAST PART CONTAINS THE APPLICATIONS NEEDED TO THE AUTHORS OF THE CODE.
+// THE LAST PART IS DIVIDED IN SEGMENTS SEPARATED BY "//segment": ONE FOR EACH LEVEL (actually, for levels 47,49, one level is divided in two segments).
+// IN APRIL 2020 EVERY SEGMENT (together with the non-application part) 
+// CAN BE COMPUTED SEPARATELY ON THE ONLNE CALCULATOR 
+// AVAILABLE at http://magma.maths.usyd.edu.au/calc/
+//
+//
+// DEVELOPED BY GUIDO LIDO (contact:guidomaria.lido@gmail.com) AND VALERIO DOSE, 
+// BASED ON PREVIOUS WORK OF VALERIO DOSE, PIETROMERCURI AND CLAUDIO STIRPE
+//////////////////////////////////////////////////
+
+///////////////////////////////////////////////////
+// GENUS COMPUTATIONS
+//////////////////////////////////////////////////
+
+Genus_Xns := function(level)
+    beta_2 := 1;
+    beta_3 := 1;
+    for p in PrimeDivisors(level) do
+        if ((p mod 4) ne 3) then
+            beta_2 := 0;
+        end if;
+        if ((p mod 3) ne 2) then
+            beta_3 := 0;
+        end if;
+    end for;
+    answer := 1 + EulerPhi(level)*(level-6)/12 - 2^(#PrimeDivisors(level))*beta_2/4 - 2^(#PrimeDivisors(level))*beta_3/3;
+    return Ceiling(answer);
+end function;
+
+Genus_Xnspl := function(level)
+    // We use Baran's notation. It works if level is not congruent to 2 modulo 4.
+    beta_boh := 1;
+    beta_3 := 1;
+    for p in PrimeDivisors(level) do
+        if ((p mod 3) ne 2) then
+            beta_3 := 0;
+        end if;
+        r := Valuation(level, p);
+        if p eq 2 then
+            beta_boh *:= p^r;
+        elif ((p mod 4) eq 1) then
+            beta_boh *:= p^r-p^(r-1);
+        else
+            beta_boh *:= p^r+p^(r-1)+2;
+        end if;
+    end for;
+    answer := 1 + EulerPhi(level)*(level-6)/(12*2^(#PrimeDivisors(level))) - beta_3/3 - beta_boh/(4*2^(#PrimeDivisors(level)));
+    return Ceiling(answer);
+end function;
+
+Genus_Xspl := function(level)
+    eps_2 := 1;
+    eps_3 := 1;
+    eps_inf := 1;
+    d:=1;
+    for p in PrimeDivisors(level) do
+        r := Valuation(level, p);
+        if p eq 2 then
+            eps_2 *:= 2^(r-1);
+        elif ((p mod 4) eq 1) then
+            eps_2 *:= (1 + (p^(r-1)*(p-1))/2);
+        else
+            eps_2 *:= ((p^(r-1)*(p+1))/2);
+        end if;
+        if p^r eq 2 then
+            eps_inf *:= 2;
+        else
+            eps_inf *:= ((p^(r-1)*(p+1))/2);
+        end if;
+        if ((p mod 3) eq 1) then
+            eps_3 *:= 1;
+        else
+            eps_3 *:= 0;
+        end if;
+        d *:= ((p^(2*r-1)*(p+1))/2);        
+    end for;
+    answer := 1 + d/12 - eps_2/4 - eps_3/3 - eps_inf/2;
+    return Ceiling(answer);
+end function;
+
+
+
+/////////////////////////////////////////
+// NUMBER OF POINTS OVER F_power_prime
+//////////////////////////////////////////
+
+List_XnsOfFQ1234 := function(l,Q,m) 
+    // the output is [a_1,... a_m] where a_i = # X_ns(l)(F_Q^i). l must be the power of a prime and Q the power of a prime not dividing l.
+    q:=PrimeDivisors(Q)[1];
+    esp0 := Valuation(Q,q);
+    DIVI:=Divisors(l);
+    if q in DIVI then
+        print "Error: the characteristis of the finite field divides the level of the modular curve";
+        return 0;
+    end if;
+    if #PrimeDivisors(l) ne 1 then
+        print "Error: the level is not the power of a prime";
+        return 0;
+    end if;
+    divi:=#DIVI;
+    answer:=[];
+    for k:=1 to m do
+        Append(~answer,Q^k+1);
+    end for;
+    g:=0;
+    for d in DIVI do // questo ciclo sembra avere a che fare con le forme modulari. Non usa q
+        R:=CuspForms(Gamma0(d^2),2);
+        U:=Newforms(R);
+        dim2:=#U;
+        //a:=#Divisors((Quotrem(l,DIVI[d])));
+        //a:=1;
+        for cont:=1 to dim2 do
+            g +:= #(U[cont]);
+            h1:=U[cont][1];
+            mu:=MinimalPolynomial(Coefficient(h1,q));
+            if Degree(mu) eq 1 then
+                F:=NumberField(mu);
+                aq:=F!Coefficient(h1,q);
+            else
+                F<aq>:=NumberField(mu);
+            end if;
+            mult_factor:= #(U[cont])/Degree(F);
+            FofX<x>:=PolynomialRing(F);
+            quadpol:=x^2+q-aq*x;
+            if IsIrreducible(quadpol) then
+                F2<bq>:=ext<F|quadpol>;
+                bq_u:=bq^esp0; bqpower:=F2!1;
+                for k:=1 to m do
+                    bqpower *:= bq_u;
+                    answer[k] := answer[k] - mult_factor*Trace(Trace(bqpower));
+                end for;
+            else
+                //print "questo pensavo non dovesse accadere";
+                bq1:=Roots(quadpol)[1][1];
+                bq2:=Roots(quadpol)[2][1];
+                bq1_u := bq1^esp0; bqpower1 := F!1;
+                bq2_u := bq2^esp0; bqpower2 := F!1;
+                for k:=1 to m do
+                    bqpower1 *:= bq1_u;
+                    bqpower2 *:= bq2_u;
+                    answer[k] := answer[k] - mult_factor*(Trace(bqpower1)+Trace(bqpower2));
+                end for;
+            end if;
+        end for;
+    end for;
+    return answer;
+end function;
+
+SegnoNum := function(p, h1)
+    // This function somputes numerically the sign of the Atkin Lehner Involution. It is only used to do a check.
+    CC := ComplexField();
+    tau:=CC.1/(2*p);
+    ss1:=0;
+    ss2:=0;
+    for nn:=1 to 200 do
+        ss1:=ss1+Conjugate(Coefficient(h1,nn),1)*Exp(-2*Pi(CC)*CC.1*nn/(p^2*tau));
+        ss2:=ss2+Conjugate(Coefficient(h1,nn),1)*Exp(2*Pi(CC)*CC.1*tau*nn);
+    end for;
+    quasi_risposta := (1/(p^2*tau^2))*ss1/ss2;
+    risposta := Round(quasi_risposta);
+    if Abs(CC!(risposta)-quasi_risposta) ge 0.2 then
+        print "Be Careful to SegnoNum";
+    end if;
+    return risposta;
+end function;
+
+List_XnsplOfFQ1234 := function(l,Q,m)
+    // the output is [a_1,... a_m] where a_i = # X_ns^+(l)(F_Q^i). l must be the power of a prime and Q the power of a prime not dividing l.
+    q:=PrimeDivisors(Q)[1];
+    esp0 := Valuation(Q,q);
+    DIVI:=Divisors(l);
+    if q in DIVI then
+        print "Error: the characteristic of the finite field divides the level of the modular curve";
+        return 0;
+    end if;
+    if #PrimeDivisors(l) ne 1 then
+        print "Error: the level is not the power of a prime";
+        return 0;
+    end if;
+    divi:=#DIVI;
+    answer:=[];
+    for k:=1 to m do
+        Append(~answer,Q^k+1);
+    end for;
+    g:=0; //just a check on the genus
+    for d in DIVI do // questo ciclo sembra avere a che fare con le forme modulari. Non usa q
+        R:=CuspForms(Gamma0(d^2),2);
+        preccc:=100+2*q+20*Dimension(R);
+        SetPrecision(R,preccc);
+        // Some precomputations for the Atkin Lehner sign
+        B:=Basis(R);
+        orders_B:=[];
+        for i in [1..#B] do 
+            new_order:=1;
+            while Coefficient(B[i],new_order) eq 0 do
+                new_order +:=1;
+            end while;
+            orders_B:=Append(orders_B, new_order);
+            if (i ge 2) and (new_order le orders_B[i-1]) then
+                print "Error: the basis of CuspForms is not as expected";
+            end if;
+        end for;  
+        W:=(AtkinLehnerOperator(R,d^2));
+        W1:=Eigenspace(W,1);
+        // Wm1:=Eigenspace(W,-1); // it was a check.
+        V:=VectorSpace(RationalField(), #B);
+        U:=Newforms(R);
+        dim2:=#U;
+        for cont:=1 to dim2 do
+            h1:=U[cont][1];
+            trace_vec:=[Trace(Coefficient(h1,orders_B[1]))];
+            for i in [2 .. #B] do
+                new_entry:= Trace(Coefficient(h1,orders_B[i]));
+                for j in  [1 .. i-1] do
+                    new_entry := new_entry - trace_vec[j]*Coefficient(B[j],orders_B[i]);     
+                end for; 
+                new_entry:=new_entry/Coefficient(B[i],orders_B[i]);
+                trace_vec:=Append(trace_vec, new_entry);
+            end for;
+            segno:=-1;
+            if V!trace_vec in W1 then
+                segno:=1;
+            // elif V!trace_vec in Wm1 then // then next lines were a check
+            //    segno:=-1;
+            // else
+            //    print "Error: there is a problem in computing the sign of the Atkin-Lehner operator";
+            end if;
+            if segno ne SegnoNum(d,h1) then
+                print "Errore in SegnoNum";
+            end if;
+            if segno eq 1 then
+                g +:= #(U[cont]);
+                mu:=MinimalPolynomial(Coefficient(h1,q));
+                if Degree(mu) eq 1 then
+                    F:=NumberField(mu);
+                    aq:=F!Coefficient(h1,q);
+                else
+                    F<aq>:=NumberField(mu);
+                end if;
+                mult_factor:= #(U[cont])/Degree(F);
+                FofX<x>:=PolynomialRing(F);
+                quadpol:=x^2+q-aq*x;
+                if IsIrreducible(quadpol) then
+                    F2<bq>:=ext<F|quadpol>;
+                    bq_u:=bq^esp0; bqpower:=F2!1;
+                    for k:=1 to m do
+                        bqpower *:= bq_u;
+                        answer[k] := answer[k] - mult_factor*Trace(Trace(bqpower));
+                    end for;
+                else
+                    //print "questo pensavo non dovesse accadere";
+                    bq1:=Roots(quadpol)[1][1];
+                    bq2:=Roots(quadpol)[2][1];
+                    bq1_u := bq1^esp0; bqpower1 := F!1;
+                    bq2_u := bq2^esp0; bqpower2 := F!1;
+                    for k:=1 to m do
+                        bqpower1 *:= bq1_u;
+                        bqpower2 *:= bq2_u;
+                        answer[k] := answer[k] - mult_factor*(Trace(bqpower1)+Trace(bqpower2));
+                    end for;
+                end if;
+            end if;
+        end for;
+    end for;
+    return answer;
+end function;
+
+List_X0plOfFQ1234 := function(l,Q,m) 
+   // the output is [a_1,... a_m] where a_i = # X_0^+(l)(F_Q^i). l must be the power of a prime and Q the power of a prime not dividing l.
+    q:=PrimeDivisors(Q)[1];
+    esp0 := Valuation(Q,q);
+    S:=CuspForms(Gamma0(l),2);
+    precision:=100+2*q;
+    SetPrecision(S,precision);
+    B:=Basis(S);
+    MatQ:=KMatrixSpace(RationalField(),#B,#B);
+    T:=MatQ!HeckeOperator(S,q);
+    W:=(AtkinLehnerOperator(S,l));
+    W1:=Eigenspace(W,1);
+    BW1:=Basis(W1);
+    //WARNINGS
+    if q in PrimeDivisors(l) then
+        print "Error: the characteristic of the finite field divides the level of the modular curve";
+        return 0;
+    elif ((#BW1 eq 0) or (#BW1 eq 1)) then
+        print("WARNING: Genus less than 2!!!");
+        return 0;
+    end if; 
+    MBW1:=Matrix(BW1);
+    TBW1:=MBW1*T;
+    TonW1:=[];
+    for i:=1 to #BW1 do
+            Append(~TonW1,Coordinates(W1,TBW1[i]));
+    end for;
+    polTonW1:=CharacteristicPolynomial(Matrix(TonW1));
+    polTonW1_factors:= Factorization(polTonW1);
+    answer:=[];
+    for k:=1 to m do
+        Append(~answer,Q^k+1);
+    end for;
+    for fac in polTonW1_factors do
+        mu:=fac[1];
+        mult_factor:= fac[2];
+        if Degree(mu) eq 1 then
+            F:=NumberField(mu);
+            aq:=Roots(mu)[1][1];
+        else
+            F<aq>:=NumberField(mu);
+        end if;
+        FofX<x>:=PolynomialRing(F);
+        quadpol:=x^2+q-aq*x;
+        if IsIrreducible(quadpol) then
+            F2<bq>:=ext<F|quadpol>;
+            bq_u:=bq^esp0; bqpower:=F2!1;
+            for k:=1 to m do
+                bqpower *:= bq_u;
+                answer[k] := answer[k] - mult_factor*Trace(Trace(bqpower));
+            end for;
+        else
+            //print "questo pensavo non dovesse accadere";
+            bq1:=Roots(quadpol)[1][1];
+            bq2:=Roots(quadpol)[2][1];
+            bq1_u := bq1^esp0; bqpower1 := F!1;
+            bq2_u := bq2^esp0; bqpower2 := F!1;
+            for k:=1 to m do
+                bqpower1 *:= bq1_u;
+                bqpower2 *:= bq2_u;
+                answer[k] := answer[k] - mult_factor*(Trace(bqpower1)+Trace(bqpower2));
+            end for;
+        end if;
+    end for;
+    return answer;
+end function;
+
+List_XsplOfFQ1234 := function(l,q,rmax) 
+    return List_X0plOfFQ1234(l^2,q,rmax);
+end function;
+
+////////////////////////////////////////////////////////////////
+// BOUNDS FOR AUTOMORPHISMS
+////////////////////////////////////////////////////////////////
+SumDigits := function(number_l, modulus_l) // scriviamo number_l in base modulus_l e ritorniamo la somma delle cifre.
+    change_number_l := number_l;
+    risposta := 0;
+    while change_number_l ge modulus_l do
+        new_digit_l := change_number_l mod modulus_l;
+        change_number_l := (change_number_l - new_digit_l) div modulus_l;
+        risposta := risposta + new_digit_l;
+    end while;
+    risposta := risposta + change_number_l;
+    return risposta;
+end function;
+
+GonzTest_oneo := function(type_curve, level, order_aut: Q:=9, up_to:=500)
+    // This function computes the two quantities Somma and Bound that are present in Theorem 2.1 in Gonzales' paper. The first argument type_curve must be a string, either ns, nsp or sp, indicating the non-split, non-split-plus or the split-plus-curve. In Gonzales paper Somma is an infinite sum, here we compute up to the index up_to. If Somma>Bound we deduce that X_s^+(level) has no automorphism of order order_aut over the finite field F_Q. If Bound<Somma then we write "The X_s^+(level) may have automorphisms of order order_aut". We suppose level is the power of a prime and that order_aut is the power of a prime.
+    if type_curve eq "ns" then
+        list_points:=List_XnsOfFQ1234(level, Q, up_to);
+        g:=Genus_Xns(level);
+    elif type_curve eq "ns^+" then
+        list_points:=List_XnsplOfFQ1234(level, Q, up_to);
+        g:=Genus_Xnspl(level);
+    elif type_curve eq "s^+" then
+        list_points:=List_XsplOfFQ1234(level, Q, up_to);
+        g:=Genus_Xspl(level);
+    else 
+        print "I do not know how to treat the kind of curve you gave me";
+        return 0;
+    end if;
+    list_A_n := [];
+    for i in [1 .. up_to] do
+        new_points := 0;
+        divi := Divisors(i);
+        for d in divi do
+            new_points +:= MoebiusMu(d)*list_points[(i div d)];
+        end for;
+        list_A_n := Append(list_A_n, new_points);
+    end for;
+    prime_aut:=PrimeDivisors(order_aut)[1];
+    Somma := 0;
+    for i in [1 .. up_to] do
+        Ln:=order_aut div GCD(order_aut,i);
+        Pn:=(list_A_n[i] div i) mod Ln; 
+        Dn:=SumDigits(Pn,prime_aut);
+        Somma +:= i*(Ln*Dn-Pn);
+    end for;
+    BoundGonz := 2*g + 2*order_aut-2;
+    // print "La somma definita da Gonzales fino a ",up_to, " è uguale a ", Somma;
+    // print "L'upper bound di Gonzales è ",BoundGonz;
+    if Somma gt BoundGonz then
+        //print "Non ci sono automorfismi di ordine ", order_aut;
+        print "X_",type_curve,"(" ,level," ) does NOT have automorphisms of order ",order_aut;
+        return "I am happy";
+    else
+        print "X_",type_curve,"(",level," ) may have automorphisms of order ",order_aut;
+        return "Are you happy?";
+    end if;
+end function;
+
+
+GonzTest_onep := function(type_curve, level, prime_aut: Q:=9, up_to:=500)
+    // This function computes the two quantities Somma and Bound that are present in Equation 2.1 in Gonzales' paper. The first argument type_curve must be a string, either ns, nsp or sp, indicating the non-split, non-split-plus or the split-plus-curve. In Gonzales paper Somma is an infinite sum, here we compute up to the index up_to. If Somma>Bound we deduce that X_s^+(level) has no automorphism of order prime_aut over the finite field F_Q. If Bound<Somma then we write "The X_s^+(level) may have automorphisms of order prime_aut". We suppose level is the power of a prime.
+    if type_curve eq "ns" then
+        list_points:=List_XnsOfFQ1234(level, Q, up_to);
+        g:=Genus_Xns(level);
+    elif type_curve eq "ns^+" then
+        list_points:=List_XnsplOfFQ1234(level, Q, up_to);
+        g:=Genus_Xnspl(level);
+    elif type_curve eq "s^+" then
+        list_points:=List_XsplOfFQ1234(level, Q, up_to);
+        g:=Genus_Xspl(level);
+    else 
+        print "I do not know how to treat the kind of curve you gave me";
+        return 0;
+    end if;
+    list_A_n := [];
+    for i in [1 .. up_to] do
+        new_points := 0;
+        divi := Divisors(i);
+        for d in divi do
+            new_points +:= MoebiusMu(d)*list_points[(i div d)];
+        end for;
+        list_A_n := Append(list_A_n, new_points);
+    end for;
+    Somma := 0;
+    for i in [1 .. up_to] do
+        Somma +:= (list_A_n[i] mod prime_aut);
+    end for;
+    BoundGonz := 2 + ((2*g) div (prime_aut-1));
+    // print "La somma definita da Gonzales fino a ",up_to, " è uguale a ", Somma;
+    // print "L'upper bound di Gonzales è ",BoundGonz;
+    if Somma gt BoundGonz then
+        //print "Non ci sono automorfismi di ordine ", prime_aut;
+        print "X_",type_curve,"(" ,level," ) does NOT have automorphisms of order ",prime_aut;
+        return "I am happy";
+    else
+        print "X_",type_curve,"(",level," ) may have automorphisms of order ",prime_aut;
+        return "Are you happy?";
+    end if;
+end function;
+
+GonzTest_allp := function(type_curve, level: Q:=9, up_to:=500) 
+    // We do the same that it is done in the function above, but we "test" if the modular curve curve has automorphisms of order o for all the primes o < 84*(g-1). We output the list of primes that we are unable to exclude. We suppose the level is the power of a prime.
+    if type_curve eq "ns" then
+        list_points:=List_XnsOfFQ1234(level, Q, up_to);
+        g:=Genus_Xns(level);
+    elif type_curve eq "ns^+" then
+        list_points:=List_XnsplOfFQ1234(level, Q, up_to);
+        g:=Genus_Xnspl(level);
+    elif type_curve eq "s^+" then
+        list_points:=List_XsplOfFQ1234(level, Q, up_to);
+        g:=Genus_Xspl(level);
+    else 
+        print "I do not know how to treat the kind of curve you gave me";
+        return 0;
+    end if;
+    list_A_n := [];
+    for i in [1 .. up_to] do
+        new_points := 0;
+        divi := Divisors(i);
+        for d in divi do
+            new_points +:= MoebiusMu(d)*list_points[(i div d)];
+        end for;
+        list_A_n := Append(list_A_n, new_points);
+    end for;
+ bad_primes := [];
+    order_aut := 2;
+    while order_aut le 84*(g-1) do
+        BoundGonz := 2 + ((2*g) div (order_aut-1));    
+        Somma := 0;
+        for i in [1 .. up_to] do
+            Somma +:= (list_A_n[i] mod order_aut);
+        end for;
+        if Somma le BoundGonz then
+            bad_primes := Append(bad_primes, order_aut);
+        end if;
+        order_aut := NextPrime(order_aut);
+    end while; 
+    return bad_primes;
+end function;
+
+
+
+////////////////////////////////////
+// APPLICATIONS
+///////////////////////////////////
+
+// automorphisms of curves of level 25 are defined over Q(sqrt(-5)). Since 3 (and 7) split in this field it ie enough proving that there are no extra automorphisms over F_3 (or over F_7). The result of the code below says that 
+// 1) X_s^+(25) has no automorphisms, 
+// 2) if X_ns^+(25) has extra automorphisms, then this automorphisms have order 3^e. We can exclude automorphisms of order 3 using a better bound.
+// 3) if X_ns(25) has extra automorphisms, then this automorphisms have order 2^e. This tells us that Aut(X_ns(25)) is a 2-group. If Aut(X_ns(25)) is not Z/2 then the modular involution commutes with at least one automorphism u which is not modular, hence u pushes down to a non-trivial automorphism of X_ns^+(25), which is absurd. Hence Aut(X_ns(25))=Z/2
+print "If X_ns(25) has an automorphism of order a prime p, then p is in the following list";
+GonzTest_allp("ns", 25: Q:=3, up_to:=1000);
+print "If X_s^+(25) has an automorphism of order a prime p, then p is in the following list";
+GonzTest_allp("s^+", 25: Q:=3, up_to:=1000);
+print "If X_ns^+(25) has an automorphism of order a prime p, then p is in the following list";
+GonzTest_allp("ns^+", 25: Q:=3, up_to:=1000);
+GonzTest_oneo("ns^+", 25,3: Q:=7, up_to:=1000);
+
+//segment
+
+// Let l=37,41,43,47,49. Automorphisms of Cartan curves of level l are defined over a quadratic field, hence it is enough proving that there are not extra automorphisms over F_9. The result of the code below says that 
+// 1) if X_ns^+(37) has no extra automorphisms.
+// 2) if X_ns(37) has extra automorphisms, then this automorphisms have order 2^e. This tells us that Aut(X_ns(37)) is a 2-group. If Aut(X_ns(37)) is not Z/2 then the modular involution commutes with at least one automorphism u which is not modular, hence u pushes down to a non-trivial automorphism of X_ns^+(37).which is absurd. Hence Aut(X_ns(25))=Z/2
+print "If X_ns(37) has an automorphism of order a prime p, then p is in the following list";
+GonzTest_allp("ns", 37);
+print "If X_ns^+(37) has an automorphism of order a prime p, then p is in the following list";
+GonzTest_allp("ns^+", 37);
+
+//segment
+
+print "If X_ns(41) has an automorphism of order a prime p, then p is in the following list";
+GonzTest_allp("ns", 41);
+print "If X_ns^+(41) has an automorphism of order a prime p, then p is in the following list";
+GonzTest_allp("ns^+", 41);
+
+//segment
+
+print "If X_ns(43) has an automorphism of order a prime p, then p is in the following list";
+GonzTest_allp("ns", 43);
+print "If X_ns^+(43) has an automorphism of order a prime p, then p is in the following list";
+GonzTest_allp("ns^+", 43);
+
+//segment
+
+print "If X_ns(47) has an automorphism of order a prime p, then p is in the following list";
+GonzTest_allp("ns", 47);
+
+//segment
+
+print "If X_ns^+(47) has an automorphism of order a prime p, then p is in the following list";
+GonzTest_allp("ns^+", 47);
+GonzTest_oneo("ns^+", 47,2);
+
+//segment
+
+print "If X_s^+(49) has an automorphism of order a prime p, then p is in the following list";
+GonzTest_allp("s^+", 49);
+print "If X_ns(49) has an automorphism of order a prime p, then p is in the following list";
+GonzTest_allp("ns", 49);
+print "If X_ns^+(49) has an automorphism of order a prime p, then p is in the following list";
+GonzTest_allp("ns^+", 49);
+
+//segment
+
+GonzTest_oneo("s^+", 49,2: Q:=4);
+GonzTest_oneo("ns^+", 49,2:Q:=4);
+
+//segment
+
+
+// automorphisms of curves of level 2^e are defined over Q(sqrt(-2),i). Since 17 splits in this field it ie enough proving that there are not extra automorphisms over F_{17}
+// The next part does not give conclusing proof, neither for 2^e, nor for 3^3. 
+/*
+print "If X_ns(",25,") has an automorphism of order a prime p, then p is in the following list";
+GonzTest_allp("ns",16: Q:=17, up_to:=10000);
+GonzTest_allp("ns^+",16: Q:=17, up_to:=10000);
+
+
+GonzTest_allp("ns",16);
+GonzTest_allp("ns^+",16);
+
+GonzTest_allp("ns",32: Q:=5^4);
+GonzTest_allp("ns^+",32: Q:=5^4);
+
+GonzTest_allp("ns^+",64: Q:=23^8, up_to:=7000);
+GonzTest_allp("ns",64: Q:=23^8, up_to:=1000);
+
+
+GonzTest_allp("ns^+",27: Q:=4);
+*/
