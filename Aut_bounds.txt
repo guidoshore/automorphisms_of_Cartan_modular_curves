@@ -11,7 +11,7 @@
 //
 //
 // DEVELOPED BY GUIDO LIDO (contact:guidomaria.lido@gmail.com) AND VALERIO DOSE, 
-// BASED ON PREVIOUS WORK OF VALERIO DOSE, PIETROMERCURI AND CLAUDIO STIRPE
+// BASED ON PREVIOUS WORK OF VALERIO DOSE, PIETRO MERCURI AND CLAUDIO STIRPE
 //////////////////////////////////////////////////
 
 ///////////////////////////////////////////////////
