@@ -550,27 +550,3 @@ GonzTest_allp("ns^+", 49);
 
 GonzTest_oneo("s^+", 49,2: Q:=4);
 GonzTest_oneo("ns^+", 49,2:Q:=4);
-
-//segment
-
-
-// automorphisms of curves of level 2^e are defined over Q(sqrt(-2),i). Since 17 splits in this field it ie enough proving that there are not extra automorphisms over F_{17}
-// The next part does not give conclusing proof, neither for 2^e, nor for 3^3. 
-/*
-print "If X_ns(",25,") has an automorphism of order a prime p, then p is in the following list";
-GonzTest_allp("ns",16: Q:=17, up_to:=10000);
-GonzTest_allp("ns^+",16: Q:=17, up_to:=10000);
-
-
-GonzTest_allp("ns",16);
-GonzTest_allp("ns^+",16);
-
-GonzTest_allp("ns",32: Q:=5^4);
-GonzTest_allp("ns^+",32: Q:=5^4);
-
-GonzTest_allp("ns^+",64: Q:=23^8, up_to:=7000);
-GonzTest_allp("ns",64: Q:=23^8, up_to:=1000);
-
-
-GonzTest_allp("ns^+",27: Q:=4);
-*/
